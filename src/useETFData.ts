@@ -251,47 +251,10 @@ export function useWatchlist() {
 }
 
 // ============================================================
-// SCANNER HOOK — sequential with 250ms delay, smart caching
+// SCANNER HOOK — parallel batches, smart caching, always full scan
 // ============================================================
 
-// Quick: ~50 top Canadian stocks & ETFs
-const QUICK_SCAN_SYMBOLS = [
-  'XIU.TO','XIC.TO','XEQT.TO','VEQT.TO','VFV.TO','TEC.TO','ZEB.TO','ZAG.TO','XGD.TO','XEG.TO',
-  'XDIV.TO','VGRO.TO','ZSP.TO','ZQQ.TO','XQQ.TO','HCAL.TO','HDIV.TO',
-  'RY.TO','TD.TO','BNS.TO','BMO.TO','CM.TO','NA.TO',
-  'ENB.TO','CNQ.TO','SU.TO','TRP.TO','TOU.TO',
-  'ABX.TO','FNV.TO','WPM.TO','AEM.TO',
-  'SHOP.TO','CSU.TO',
-  'CNR.TO','CP.TO','BAM.TO','BN.TO','ATD.TO','DOL.TO','L.TO',
-  'MFC.TO','SLF.TO',
-  'FTS.TO','H.TO',
-  'AAPL','MSFT','NVDA','GOOGL','AMZN','TSLA','META','SPY','QQQ',
-];
-
-// Standard: ~150 stocks
-const STANDARD_SCAN_SYMBOLS = [
-  ...QUICK_SCAN_SYMBOLS,
-  'HXS.TO','BTCC-B.TO','HQU.TO','ZCN.TO','VCN.TO','XUU.TO','ZWB.TO','ZDV.TO','XRE.TO',
-  'ZWC.TO','XEF.TO','XEC.TO','XGRO.TO','XBAL.TO','ZGRO.TO','ZBAL.TO','VCNS.TO',
-  'XBB.TO','ZFL.TO','HISA.TO','XEI.TO','HXT.TO',
-  'EQB.TO','CWB.TO',
-  'CVE.TO','IMO.TO','PPL.TO','ARX.TO','KEY.TO','MEG.TO','WCP.TO','BTE.TO','TPZ.TO','VET.TO','CPG.TO',
-  'NTR.TO','K.TO','FM.TO','TECK-B.TO','LUN.TO','HBM.TO','IVN.TO','BTO.TO','ELD.TO','ERO.TO',
-  'BB.TO','LSPD.TO','DCBO.TO','KXS.TO','DSG.TO','GIB-A.TO','CLS.TO','NVEI.TO',
-  'BCE.TO','T.TO','RCI-B.TO','QBR-B.TO',
-  'IFC.TO','GWO.TO','IAG.TO','FFH.TO','POW.TO','X.TO','BIP-UN.TO','BEP-UN.TO',
-  'REI-UN.TO','CAR-UN.TO','GRT-UN.TO','DIR-UN.TO','SRU-UN.TO','CHP-UN.TO',
-  'AC.TO','CAE.TO','BBD-B.TO',
-  'MRU.TO','GIL.TO','WN.TO','CTC-A.TO','MG.TO','QSR.TO','PBH.TO',
-  'EMA.TO','AQN.TO','CU.TO','CPX.TO','NPI.TO',
-  'WSP.TO','STN.TO','WCN.TO','TIH.TO','FTT.TO',
-  'WEED.TO','TLRY.TO',
-  'AMD','AVGO','NFLX','CRM','ADBE','INTC','QCOM','PLTR','COIN','JPM','V','MA',
-  'WMT','COST','HD','DIS','XOM','BA','GE','UNH','LLY','JNJ',
-  'IWM','VOO','VTI','ARKK','GLD','SOXX','SMH',
-];
-
-export type ScanMode = 'quick' | 'standard' | 'full';
+export type ScanMode = 'full';
 
 export function useScanner() {
   const [scanResults, setScanResults] = useState<ProcessedETF[]>([]);
@@ -299,7 +262,7 @@ export function useScanner() {
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStatus, setScanStatus] = useState('');
   const [lastScan, setLastScan] = useState<Date | null>(null);
-  const [scanMode, setScanMode] = useState<ScanMode>('quick');
+  const [scanMode, setScanMode] = useState<ScanMode>('full');
   const [scannedCount, setScannedCount] = useState(0);
   const [totalToScan, setTotalToScan] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
@@ -338,72 +301,28 @@ export function useScanner() {
     }
   };
 
-  const flushScanCache = useCallback((mode?: ScanMode) => {
-    if (mode) {
-      localStorage.removeItem(SCANNER_CACHE_KEY + '_' + mode);
-    } else {
-      // Flush all scan caches
-      localStorage.removeItem(SCANNER_CACHE_KEY + '_quick');
-      localStorage.removeItem(SCANNER_CACHE_KEY + '_standard');
-      localStorage.removeItem(SCANNER_CACHE_KEY + '_full');
-    }
+  const flushScanCache = useCallback(() => {
+    localStorage.removeItem(SCANNER_CACHE_KEY + '_full');
   }, []);
 
   const cancelScan = useCallback(() => {
     cancelRef.current = true;
   }, []);
 
-  // Build the symbol list for a given mode
-  const getUniverseForMode = (mode: ScanMode) => {
-    const seen = new Set<string>();
-    const universe: { symbol: string; yahooSymbol: string; name: string; category: string }[] = [];
-
-    const addSymbols = (symbols: string[]) => {
-      for (const sym of symbols) {
-        if (seen.has(sym)) continue;
-        seen.add(sym);
-        const found = SCANNER_UNIVERSE.find(s => s.yahooSymbol === sym);
-        if (found) {
-          universe.push(found);
-        } else {
-          const etf = ETF_LIST.find(e => e.yahooSymbol === sym);
-          if (etf) {
-            universe.push({ symbol: etf.symbol, yahooSymbol: etf.yahooSymbol, name: etf.name, category: etf.category });
-          }
-        }
-      }
-    };
-
-    if (mode === 'quick') {
-      addSymbols(QUICK_SCAN_SYMBOLS);
-    } else if (mode === 'standard') {
-      addSymbols(STANDARD_SCAN_SYMBOLS);
-    } else {
-      for (const stock of SCANNER_UNIVERSE) {
-        if (!seen.has(stock.yahooSymbol)) {
-          seen.add(stock.yahooSymbol);
-          universe.push(stock);
-        }
-      }
-      for (const etf of ETF_LIST) {
-        if (!seen.has(etf.yahooSymbol)) {
-          seen.add(etf.yahooSymbol);
-          universe.push({ symbol: etf.symbol, yahooSymbol: etf.yahooSymbol, name: etf.name, category: etf.category });
-        }
-      }
-    }
-    return universe;
-  };
-
   // ---- Main scan function ----
   // forceAll = true: flush cache and rescan everything
   // forceAll = false: use cache + only retry failed symbols
-  const runScan = useCallback(async (mode: ScanMode = 'quick', forceAll = false) => {
-    const fullUniverse = getUniverseForMode(mode);
+  const runScan = useCallback(async (mode: ScanMode = 'full', forceAll = false) => {
+    // Build the full universe: all scanner stocks + any base ETFs not already included
+    const seen = new Set(SCANNER_UNIVERSE.map(s => s.yahooSymbol));
+    const etfExtras = ETF_LIST
+      .filter(e => !seen.has(e.yahooSymbol))
+      .map(e => ({ symbol: e.symbol, yahooSymbol: e.yahooSymbol, name: e.name, category: e.category }));
+    const fullUniverse = [...SCANNER_UNIVERSE, ...etfExtras];
 
-    // If force, flush the cache for this mode
+    // If force, flush the cache
     if (forceAll) {
-      flushScanCache(mode);
+      flushScanCache();
     }
 
     // Check cache
@@ -449,13 +368,8 @@ export function useScanner() {
     const startTs = Date.now();
     setScanStartTime(startTs);
 
-    if (retrying) {
-      setScanStatus(`Retrying ${symbolsToScan.length} previously failed symbols (${existingResults.length} cached)...`);
-      setTotalToScan(symbolsToScan.length);
-    } else {
-      setScanStatus('Initializing scanner...');
-      setTotalToScan(symbolsToScan.length);
-    }
+    setScanStatus('Fetching market data...');
+    setTotalToScan(symbolsToScan.length);
 
     setScannedCount(0);
 
@@ -475,15 +389,14 @@ export function useScanner() {
 
     for (let batchStart = 0; batchStart < symbolsToScan.length; batchStart += BATCH_SIZE) {
       if (cancelRef.current) {
-        setScanStatus(`Scan cancelled. ${newResults.length} new + ${existingResults.length} cached results.`);
+        setScanStatus('Scan stopped.');
         const remainingFailed = symbolsToScan.slice(batchStart).map(s => s.yahooSymbol);
         newFailedSymbols.push(...remainingFailed);
         break;
       }
 
       const batch = symbolsToScan.slice(batchStart, batchStart + BATCH_SIZE);
-      const batchSymbols = batch.map(s => s.symbol).join(', ');
-      setScanStatus(`[${scannedSoFar + 1}-${Math.min(scannedSoFar + BATCH_SIZE, symbolsToScan.length)}/${symbolsToScan.length}] Scanning ${batchSymbols}...`);
+      setScanStatus('Fetching market data...');
 
       // Run batch in parallel
       await Promise.allSettled(batch.map(async (stock, batchIdx) => {
@@ -560,11 +473,7 @@ export function useScanner() {
     setScanning(false);
     setScanLogs([...logsRef.current]);
 
-    if (retrying) {
-      setScanStatus(`Done! Retried ${symbolsToScan.length} symbols. ${newResults.length} recovered, ${failed} still failing. Total: ${finalResults.length} stocks.`);
-    } else {
-      setScanStatus(`Done! ${finalResults.length} stocks analyzed, ${failed} skipped.`);
-    }
+    setScanStatus(`Scan complete. ${finalResults.length} stocks analyzed.`);
 
     // Save to cache with the list of still-failed symbols
     if (finalResults.length > 0) {
@@ -573,44 +482,34 @@ export function useScanner() {
   }, [flushScanCache]);
 
   // Force re-scan: flush cache + rescan everything
-  const forceRescan = useCallback((mode: ScanMode = 'quick') => {
-    runScan(mode, true);
+  const forceRescan = useCallback(() => {
+    runScan('full', true);
   }, [runScan]);
 
   // Normal scan: use cache + retry failures only
-  const normalScan = useCallback((mode: ScanMode = 'quick') => {
-    runScan(mode, false);
+  const normalScan = useCallback(() => {
+    runScan('full', false);
   }, [runScan]);
 
   // Auto-load cache on mount
   useEffect(() => {
-    for (const mode of ['full', 'standard', 'quick'] as ScanMode[]) {
-      const cached = loadScanCache(mode);
-      if (cached) {
-        setScanResults(cached.results);
-        setLastScan(new Date(cached.timestamp));
-        setScanMode(mode);
-        setCachedCount(cached.results.length);
-        // Show how many failed last time
-        if (cached.failedSymbols?.length > 0) {
-          setScanStatus(`${cached.results.length} cached results · ${cached.failedSymbols.length} failed last time (will retry on next scan)`);
-        }
-        return;
-      }
+    const cached = loadScanCache('full');
+    if (cached) {
+      setScanResults(cached.results);
+      setLastScan(new Date(cached.timestamp));
+      setScanMode('full');
+      setCachedCount(cached.results.length);
     }
   }, []);
 
   return {
     scanResults, scanning, scanProgress, scanStatus, lastScan,
     scanMode, scannedCount, totalToScan, failedCount,
-    totalStocksInUniverse: getUniverseForMode(scanMode).length,
+    totalStocksInUniverse: TOTAL_SCANNER_STOCKS,
     scanLogs, scanStartTime,
     isRetryMode, cachedCount,
-    // Normal scan: uses cache, only retries failed
-    runScan: (mode: ScanMode = 'quick') => normalScan(mode),
-    // Force re-scan: flushes cache, scans everything fresh
-    forceRescan: (mode: ScanMode = 'quick') => forceRescan(mode),
-    // Flush cache without scanning
+    runScan: normalScan,
+    forceRescan,
     flushCache: flushScanCache,
     cancelScan,
   };
