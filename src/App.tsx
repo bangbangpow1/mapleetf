@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard, Calendar, Lightbulb, BarChart3, Leaf, RefreshCw, Wifi, WifiOff,
   Loader2, Search, X, Star, Radar, ArrowRight, Plus, Check, TrendingUp, TrendingDown,
@@ -31,6 +31,14 @@ export function App() {
   const search = useSearch();
   const watchlist = useWatchlist();
   const scanner = useScanner();
+
+  // Merge scanner results with base ETFs so Daily/Insights/Dashboard use the full scanned universe
+  const enrichedEtfs = useMemo(() => {
+    if (scanner.scanResults.length === 0) return etfs;
+    const seen = new Set(scanner.scanResults.map(e => e.yahooSymbol));
+    const baseOnly = etfs.filter(e => !seen.has(e.yahooSymbol));
+    return [...scanner.scanResults, ...baseOnly];
+  }, [etfs, scanner.scanResults]);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -379,10 +387,10 @@ export function App() {
             </>
           ) : (
             <>
-              {activeTab === 'dashboard' && <Dashboard etfs={etfs} onSelectETF={handleSelectETF} />}
-              {activeTab === 'daily' && <DailyPicks etfs={etfs} onSelectETF={handleSelectETF} />}
-              {activeTab === 'suggestions' && <TradeSuggestions etfs={etfs} onSelectETF={handleSelectETF} />}
-              {activeTab === 'insights' && <InvestmentInsights etfs={etfs} onSelectETF={handleSelectETF} />}
+              {activeTab === 'dashboard' && <Dashboard etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
+              {activeTab === 'daily' && <DailyPicks etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
+              {activeTab === 'suggestions' && <TradeSuggestions etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
+              {activeTab === 'insights' && <InvestmentInsights etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
               {activeTab === 'watchlist' && (
                 <WatchlistView
                   watchlist={watchlist}
