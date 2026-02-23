@@ -32,12 +32,20 @@ export function App() {
   const watchlist = useWatchlist();
   const scanner = useScanner();
 
-  // Merge scanner results with base ETFs so Daily/Insights/Dashboard use the full scanned universe
+  // Merge scanner results with base ETFs so Daily/Insights/Dashboard use the full scanned universe.
+  // Scanner stocks have dividendYield/mer/description = 0/"" by default, so when a scanner result
+  // matches a known base ETF, patch in the base ETF's metadata so yields/MER stay accurate.
   const enrichedEtfs = useMemo(() => {
     if (scanner.scanResults.length === 0) return etfs;
-    const seen = new Set(scanner.scanResults.map(e => e.yahooSymbol));
+    const baseMap = new Map(etfs.map(e => [e.yahooSymbol, e]));
+    const mergedScanner = scanner.scanResults.map(e => {
+      const base = baseMap.get(e.yahooSymbol);
+      if (!base) return e;
+      return { ...e, dividendYield: base.dividendYield, mer: base.mer, description: base.description };
+    });
+    const seen = new Set(mergedScanner.map(e => e.yahooSymbol));
     const baseOnly = etfs.filter(e => !seen.has(e.yahooSymbol));
-    return [...scanner.scanResults, ...baseOnly];
+    return [...mergedScanner, ...baseOnly];
   }, [etfs, scanner.scanResults]);
 
   const searchRef = useRef<HTMLDivElement>(null);
@@ -410,7 +418,7 @@ export function App() {
       )}
 
       {/* ======== MOBILE BOTTOM NAV ======== */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1e]/90 backdrop-blur-xl border-t border-slate-800/60">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0a0f1e]/90 backdrop-blur-xl border-t border-slate-800/60" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
         <div className="flex items-center justify-around py-1.5 px-1">
           {tabs.map(tab => {
             const Icon = tab.icon;

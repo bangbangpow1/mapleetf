@@ -1,5 +1,29 @@
 import type { ETFMetadata, HistoricalDataPoint, SearchResult } from './types';
 import type { ScanLogEntry } from './scannerLog';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+
+// On native Android/iOS, use CapacitorHttp which bypasses CORS entirely.
+// On web, fall through to the CORS proxy approach.
+const isNative = Capacitor.isNativePlatform();
+
+async function nativeFetch(url: string): Promise<{ ok: boolean; status: number; text: () => Promise<string>; json: () => Promise<unknown> }> {
+  const response = await CapacitorHttp.get({
+    url,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36',
+      'Accept': 'application/json',
+    },
+  });
+  // CapacitorHttp auto-parses JSON responses — data is already an object
+  const parsed = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+  const body = JSON.stringify(parsed);
+  return {
+    ok: response.status >= 200 && response.status < 300,
+    status: response.status,
+    text: async () => body,
+    json: async () => parsed,
+  };
+}
 
 // ============================================================
 // CORE ETF LIST (initial tracked set — 12 popular Canadian ETFs)
@@ -368,7 +392,15 @@ const PROXIES = [
 // ============================================================
 // YAHOO FINANCE FETCH with CORS proxy fallback + retry
 // ============================================================
-async function fetchWithProxy(url: string, timeoutMs = 8000): Promise<Response> {
+async function fetchWithProxy(url: string, timeoutMs = 8000): Promise<{ ok: boolean; status: number; text: () => Promise<string>; json: () => Promise<unknown> }> {
+  // On native Android/iOS: call Yahoo Finance directly — no CORS, no proxy needed
+  if (isNative) {
+    const response = await nativeFetch(url);
+    if (response.ok) return response;
+    throw new Error(`Native fetch failed with status ${response.status}`);
+  }
+
+  // On web: route through CORS proxies
   for (const proxy of PROXIES) {
     try {
       const controller = new AbortController();
@@ -433,21 +465,52 @@ export async function fetchETFDataLogged(
 ): Promise<YahooChartResult | null> {
   const startTime = performance.now();
   const apiUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=6mo&interval=1d&includePrePost=false`;
-  
+
+  // On native: call Yahoo Finance directly, skip proxy loop
+  if (isNative) {
+    logEntry.proxy = 'native';
+    try {
+      const response = await nativeFetch(apiUrl);
+      logEntry.httpStatus = response.status;
+      if (!response.ok) {
+        logEntry.status = response.status === 429 ? 'throttled' : 'failed';
+        logEntry.note += `HTTP ${response.status} (native). `;
+        logEntry.durationMs = performance.now() - startTime;
+        return null;
+      }
+      const text = await response.text();
+      logEntry.responseSize = text.length;
+      const data = JSON.parse(text);
+      if (data?.chart?.result?.[0]) {
+        const result = data.chart.result[0] as YahooChartResult;
+        logEntry.dataPoints = result.timestamp?.length || 0;
+        logEntry.status = 'success';
+        logEntry.durationMs = performance.now() - startTime;
+        return result;
+      }
+      logEntry.note += 'No chart data in response. ';
+    } catch (err) {
+      logEntry.note += `Native error: ${String(err).slice(0, 80)}. `;
+    }
+    logEntry.durationMs = performance.now() - startTime;
+    logEntry.status = 'failed';
+    return null;
+  }
+
   for (let proxyIdx = 0; proxyIdx < PROXIES.length; proxyIdx++) {
     const proxy = PROXIES[proxyIdx];
     const proxyUrl = proxy.make(apiUrl);
-    
+
     if (proxyIdx > 0) {
       logEntry.proxyFallback = true;
       logEntry.note += `Fallback to ${proxy.name}. `;
     }
     logEntry.proxy = proxy.name;
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
-      
+
       const response = await fetch(proxyUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
       
