@@ -19,6 +19,7 @@
 
 ---
 
+### TESTING ###
 ### Step 2: Push Your Code to GitHub
 
 Open a terminal/command prompt in your project folder and run these commands **one by one**:
