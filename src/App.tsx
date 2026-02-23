@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  LayoutDashboard, Calendar, Lightbulb, BarChart3, Leaf, RefreshCw, Wifi, WifiOff,
+  LayoutDashboard, Calendar, Lightbulb, BarChart3, RefreshCw, Wifi, WifiOff,
   Loader2, Search, X, Star, Radar, ArrowRight, Plus, Check, TrendingUp, TrendingDown,
   Download, Smartphone
 } from 'lucide-react';
+import logoImg from './assets/logo.png';
 import type { ProcessedETF } from './types';
 import { useETFData, useSearch, useWatchlist, useScanner } from './useETFData';
 import { Dashboard } from './components/Dashboard';
@@ -125,8 +126,8 @@ export function App() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
           {/* Logo */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-900/30">
-              <Leaf className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+              <img src={logoImg} alt="MapleETF" className="w-full h-full object-cover" />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-base font-bold text-white leading-tight">MapleETF</h1>
