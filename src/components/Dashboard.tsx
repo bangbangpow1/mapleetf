@@ -78,13 +78,13 @@ export function Dashboard({ etfs, onSelectETF }: Props) {
 
       {/* Feature callouts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="rounded-xl bg-[#141b2d] border border-purple-500/20 p-4 flex items-center gap-3">
+                  <div className="rounded-xl bg-[#141b2d] border border-purple-500/20 p-4 flex items-center gap-3">
           <div className="p-2 bg-purple-500/15 rounded-lg">
             <Radar className="w-5 h-5 text-purple-400" />
           </div>
           <div>
             <p className="text-sm font-medium text-white">Market Scanner</p>
-            <p className="text-xs text-slate-500">Scans 80+ stocks to find the best trades — not just 12 ETFs</p>
+            <p className="text-xs text-slate-500">Scans 300+ stocks & ETFs across TSX + US markets</p>
           </div>
         </div>
         <div className="rounded-xl bg-[#141b2d] border border-emerald-500/20 p-4 flex items-center gap-3">
