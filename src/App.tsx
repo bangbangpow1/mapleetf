@@ -387,7 +387,7 @@ export function App() {
             </>
           ) : (
             <>
-              {activeTab === 'dashboard' && <Dashboard etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
+              {activeTab === 'dashboard' && <Dashboard etfs={enrichedEtfs} trackedEtfs={etfs} onSelectETF={handleSelectETF} />}
               {activeTab === 'daily' && <DailyPicks etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
               {activeTab === 'suggestions' && <TradeSuggestions etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}
               {activeTab === 'insights' && <InvestmentInsights etfs={enrichedEtfs} onSelectETF={handleSelectETF} />}

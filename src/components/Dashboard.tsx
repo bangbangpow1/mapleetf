@@ -3,6 +3,7 @@ import type { ProcessedETF } from '../types';
 
 interface Props {
   etfs: ProcessedETF[];
+  trackedEtfs: ProcessedETF[];
   onSelectETF: (etf: ProcessedETF) => void;
 }
 
@@ -34,7 +35,7 @@ function Sparkline({ data, color, width = 100, height = 32 }: { data: number[]; 
   );
 }
 
-export function Dashboard({ etfs, onSelectETF }: Props) {
+export function Dashboard({ etfs, trackedEtfs, onSelectETF }: Props) {
   if (etfs.length === 0) return null;
 
   const gainers = etfs.filter(e => e.changePercent > 0);
@@ -271,10 +272,10 @@ export function Dashboard({ etfs, onSelectETF }: Props) {
       <div>
         <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
           <Activity className="w-5 h-5 text-blue-400" />
-          All Tracked ETFs
+          Tracked ETFs
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {etfs.map(etf => {
+          {trackedEtfs.map(etf => {
             const pos = etf.changePercent >= 0;
             return (
               <button key={etf.symbol} onClick={() => onSelectETF(etf)} className="rounded-xl bg-[#141b2d] border border-slate-700/50 p-4 hover:border-slate-600 transition-all text-left group">

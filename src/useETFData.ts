@@ -326,13 +326,13 @@ export function useScanner() {
   const saveScanCache = (results: ProcessedETF[], failedSymbols: string[], mode: ScanMode) => {
     try {
       const key = SCANNER_CACHE_KEY + '_' + mode;
-      const trimmed = results.map(r => ({ ...r, historicalData: r.historicalData.slice(-20) }));
+      const trimmed = results.map(r => ({ ...r, historicalData: r.historicalData.slice(-60) }));
       const json = JSON.stringify({ timestamp: Date.now(), results: trimmed, failedSymbols });
       localStorage.setItem(key, json);
     } catch {
       try {
         const key = SCANNER_CACHE_KEY + '_' + mode;
-        const trimmed = results.slice(0, 100).map(r => ({ ...r, historicalData: r.historicalData.slice(-10) }));
+        const trimmed = results.slice(0, 100).map(r => ({ ...r, historicalData: r.historicalData.slice(-60) }));
         localStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), results: trimmed, failedSymbols }));
       } catch { /* give up */ }
     }
@@ -601,7 +601,7 @@ export function useScanner() {
   return {
     scanResults, scanning, scanProgress, scanStatus, lastScan,
     scanMode, scannedCount, totalToScan, failedCount,
-    totalStocksInUniverse: TOTAL_SCANNER_STOCKS,
+    totalStocksInUniverse: getUniverseForMode(scanMode).length,
     scanLogs, scanStartTime,
     isRetryMode, cachedCount,
     // Normal scan: uses cache, only retries failed

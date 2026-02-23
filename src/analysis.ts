@@ -75,15 +75,16 @@ export function calculateMomentum(prices: number[], period: number = 10): number
 }
 
 export function calculateTechnicals(prices: number[]): TechnicalIndicators {
+  const macdResult = calculateMACD(prices);
   return {
     rsi: calculateRSI(prices),
     sma20: calculateSMA(prices, 20),
     sma50: calculateSMA(prices, 50),
     ema12: calculateEMA(prices, 12),
     ema26: calculateEMA(prices, 26),
-    ...calculateMACD(prices),
-    macdSignal: calculateMACD(prices).signal,
-    macdHistogram: calculateMACD(prices).histogram,
+    macd: macdResult.macd,
+    macdSignal: macdResult.signal,
+    macdHistogram: macdResult.histogram,
     momentum: calculateMomentum(prices),
     volatility: calculateVolatility(prices),
   };
@@ -244,16 +245,20 @@ export function calculateLongTermScore(
 
   if (price > technicals.sma20 && technicals.sma20 > technicals.sma50) score += 8;
 
-  // Low cost (MER)
-  if (mer < 0.1) score += 15;
-  else if (mer < 0.25) score += 10;
-  else if (mer < 0.4) score += 5;
-  else score -= 5;
+  // Low cost (MER) — only scored when known (0 = not available for scanner stocks)
+  if (mer > 0) {
+    if (mer < 0.1) score += 15;
+    else if (mer < 0.25) score += 10;
+    else if (mer < 0.4) score += 5;
+    else score -= 5;
+  }
 
-  // Dividend yield
-  if (dividendYield > 4) score += 12;
-  else if (dividendYield > 2.5) score += 8;
-  else if (dividendYield > 1) score += 4;
+  // Dividend yield — only scored when known
+  if (dividendYield > 0) {
+    if (dividendYield > 4) score += 12;
+    else if (dividendYield > 2.5) score += 8;
+    else if (dividendYield > 1) score += 4;
+  }
 
   // Low volatility (stability for long-term)
   if (technicals.volatility < 12) score += 10;

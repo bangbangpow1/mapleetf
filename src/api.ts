@@ -143,7 +143,6 @@ export const SCANNER_UNIVERSE: { symbol: string; yahooSymbol: string; name: stri
   { symbol: 'CNR', yahooSymbol: 'CNR.TO', name: 'Canadian National Railway', category: 'Transport' },
   { symbol: 'CP', yahooSymbol: 'CP.TO', name: 'Canadian Pacific Kansas City', category: 'Transport' },
   { symbol: 'AC', yahooSymbol: 'AC.TO', name: 'Air Canada', category: 'Transport' },
-  { symbol: 'TFI', yahooSymbol: 'TFII.TO', name: 'TFI International', category: 'Transport' },
   { symbol: 'CAE', yahooSymbol: 'CAE.TO', name: 'CAE Inc', category: 'Aerospace' },
   { symbol: 'BBD.B', yahooSymbol: 'BBD-B.TO', name: 'Bombardier Inc', category: 'Aerospace' },
 
@@ -193,7 +192,7 @@ export const SCANNER_UNIVERSE: { symbol: string; yahooSymbol: string; name: stri
   { symbol: 'RBA', yahooSymbol: 'RBA.TO', name: 'RB Global (Ritchie Bros)', category: 'Industrials' },
   { symbol: 'WCN', yahooSymbol: 'WCN.TO', name: 'Waste Connections', category: 'Industrials' },
   { symbol: 'SIS', yahooSymbol: 'SIS.TO', name: 'Savaria Corp', category: 'Industrials' },
-  { symbol: 'TFII', yahooSymbol: 'TFII.TO', name: 'TFI International', category: 'Industrials' },
+  { symbol: 'TFII', yahooSymbol: 'TFII.TO', name: 'TFI International', category: 'Transport' },
   { symbol: 'ARE', yahooSymbol: 'ARE.TO', name: 'Aecon Group', category: 'Industrials' },
   { symbol: 'BDT', yahooSymbol: 'BDT.TO', name: 'Bird Construction', category: 'Industrials' },
   { symbol: 'TIH', yahooSymbol: 'TIH.TO', name: 'Toromont Industries', category: 'Industrials' },
