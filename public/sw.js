@@ -1,10 +1,9 @@
-const CACHE_NAME = 'mapleetf-v2';
+const CACHE_NAME = 'mapleetf-v3';
+const BASE_PATH = '/mapleetf/';
 
 // Install - skip waiting to activate immediately
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  // Don't pre-cache paths — we use network-first strategy
-  // This avoids 404s when paths don't match the deployment URL
   event.waitUntil(caches.open(CACHE_NAME));
 });
 
@@ -61,9 +60,9 @@ self.addEventListener('fetch', (event) => {
       .catch(() => {
         return caches.match(request).then((cached) => {
           if (cached) return cached;
-          // For navigation requests, try to return the cached index page
+          // For navigation requests, return the cached index page at /mapleetf/
           if (request.mode === 'navigate') {
-            return caches.match(new Request(self.registration.scope));
+            return caches.match(BASE_PATH) || caches.match(BASE_PATH + 'index.html');
           }
           return new Response('Offline', { status: 503 });
         });
