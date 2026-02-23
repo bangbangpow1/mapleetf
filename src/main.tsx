@@ -12,8 +12,10 @@ createRoot(document.getElementById("root")!).render(
 // Register Service Worker for PWA support
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
+    // Use relative path so it works on any base URL (GitHub Pages, Netlify, etc.)
+    const swPath = new URL("./sw.js", window.location.href).href;
     navigator.serviceWorker
-      .register("/sw.js")
+      .register(swPath)
       .then((reg) => {
         console.log("✅ Service Worker registered:", reg.scope);
       })

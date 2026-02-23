@@ -1,20 +1,11 @@
-const CACHE_NAME = 'mapleetf-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192.svg',
-  '/icon-512.svg'
-];
+const CACHE_NAME = 'mapleetf-v2';
 
-// Install - cache static assets
+// Install - skip waiting to activate immediately
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
-    })
-  );
   self.skipWaiting();
+  // Don't pre-cache paths — we use network-first strategy
+  // This avoids 404s when paths don't match the deployment URL
+  event.waitUntil(caches.open(CACHE_NAME));
 });
 
 // Activate - clean old caches
@@ -31,13 +22,17 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch - network first for API calls, cache first for static assets
+// Fetch - network first for everything, fallback to cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
 
   // Skip non-GET requests
   if (request.method !== 'GET') return;
+
+  // Skip chrome-extension and other non-http
+  if (!request.url.startsWith('http')) return;
+
+  const url = new URL(request.url);
 
   // For API calls (Yahoo Finance via proxy) - network only, don't cache
   if (url.hostname.includes('corsproxy') || 
@@ -53,23 +48,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For static assets - cache first, then network
+  // For static assets - network first, fallback to cache
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => {
-        // Return offline fallback for navigation
-        if (request.mode === 'navigate') {
-          return caches.match('/');
-        }
-        return new Response('Offline', { status: 503 });
-      });
-    })
+      })
+      .catch(() => {
+        return caches.match(request).then((cached) => {
+          if (cached) return cached;
+          // For navigation requests, try to return the cached index page
+          if (request.mode === 'navigate') {
+            return caches.match(new Request(self.registration.scope));
+          }
+          return new Response('Offline', { status: 503 });
+        });
+      })
   );
 });
