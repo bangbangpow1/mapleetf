@@ -469,74 +469,76 @@ export function useScanner() {
       setScanResults(existingResults);
     }
 
-    // ---- SEQUENTIAL SCANNING with 250ms delay between each call ----
-    for (let i = 0; i < symbolsToScan.length; i++) {
+    // ---- PARALLEL SCANNING — 4 concurrent requests per batch, 150ms between batches ----
+    const BATCH_SIZE = 4;
+    let scannedSoFar = 0;
+
+    for (let batchStart = 0; batchStart < symbolsToScan.length; batchStart += BATCH_SIZE) {
       if (cancelRef.current) {
         setScanStatus(`Scan cancelled. ${newResults.length} new + ${existingResults.length} cached results.`);
-        // Save partial progress — remaining unsscanned symbols are still "failed"
-        const remainingFailed = symbolsToScan.slice(i).map(s => s.yahooSymbol);
+        const remainingFailed = symbolsToScan.slice(batchStart).map(s => s.yahooSymbol);
         newFailedSymbols.push(...remainingFailed);
         break;
       }
 
-      const stock = symbolsToScan[i];
-      setScanStatus(`[${i + 1}/${symbolsToScan.length}] Scanning ${stock.symbol} (${stock.name})`);
+      const batch = symbolsToScan.slice(batchStart, batchStart + BATCH_SIZE);
+      const batchSymbols = batch.map(s => s.symbol).join(', ');
+      setScanStatus(`[${scannedSoFar + 1}-${Math.min(scannedSoFar + BATCH_SIZE, symbolsToScan.length)}/${symbolsToScan.length}] Scanning ${batchSymbols}...`);
 
-      // Create log entry
-      const logEntry = createLogEntry(stock.yahooSymbol, Math.floor(i / 10) + 1, 1);
-      logsRef.current = [...logsRef.current, logEntry];
+      // Run batch in parallel
+      await Promise.allSettled(batch.map(async (stock, batchIdx) => {
+        const globalIdx = batchStart + batchIdx;
+        const logEntry = createLogEntry(stock.yahooSymbol, Math.floor(globalIdx / 10) + 1, 1);
+        logsRef.current = [...logsRef.current, logEntry];
 
-      try {
-        const raw = await fetchETFDataLogged(stock.yahooSymbol, logEntry);
-        if (raw) {
-          const hist = parseChartData(raw);
-          if (hist.length > 10) {
-            const meta = {
-              symbol: stock.symbol,
-              yahooSymbol: stock.yahooSymbol,
-              name: stock.name,
-              category: stock.category,
-              mer: 0, dividendYield: 0,
-              description: `${stock.name} — ${stock.category}`,
-            };
-            const processed = processETFData(meta, hist, 'live');
-            newResults.push(processed);
+        try {
+          const raw = await fetchETFDataLogged(stock.yahooSymbol, logEntry);
+          if (raw) {
+            const hist = parseChartData(raw);
+            if (hist.length > 10) {
+              const meta = {
+                symbol: stock.symbol,
+                yahooSymbol: stock.yahooSymbol,
+                name: stock.name,
+                category: stock.category,
+                mer: 0, dividendYield: 0,
+                description: `${stock.name} — ${stock.category}`,
+              };
+              const processed = processETFData(meta, hist, 'live');
+              newResults.push(processed);
+            } else {
+              logEntry.status = 'skipped';
+              logEntry.note += `Only ${hist.length} valid data points. `;
+              failed++;
+              newFailedSymbols.push(stock.yahooSymbol);
+            }
           } else {
-            logEntry.status = 'skipped';
-            logEntry.note += `Only ${hist.length} valid data points. `;
             failed++;
             newFailedSymbols.push(stock.yahooSymbol);
           }
-        } else {
+        } catch (err) {
+          logEntry.status = 'failed';
+          logEntry.note += `Uncaught: ${String(err).slice(0, 60)}. `;
           failed++;
           newFailedSymbols.push(stock.yahooSymbol);
         }
-      } catch (err) {
-        logEntry.status = 'failed';
-        logEntry.note += `Uncaught: ${String(err).slice(0, 60)}. `;
-        failed++;
-        newFailedSymbols.push(stock.yahooSymbol);
-      }
 
-      if (logEntry.status === 'pending') logEntry.status = 'failed';
+        if (logEntry.status === 'pending') logEntry.status = 'failed';
+      }));
 
-      // Update UI after each stock
-      setScannedCount(i + 1);
+      // Update UI after each batch
+      scannedSoFar = Math.min(batchStart + BATCH_SIZE, symbolsToScan.length);
+      setScannedCount(scannedSoFar);
       setFailedCount(failed);
-      setScanProgress(((i + 1) / symbolsToScan.length) * 100);
+      setScanProgress((scannedSoFar / symbolsToScan.length) * 100);
 
-      // Merge new results with existing cached results for display
       const allResults = [...existingResults, ...newResults].sort((a, b) => b.signalConfidence - a.signalConfidence);
       setScanResults(allResults);
+      setScanLogs([...logsRef.current]);
 
-      // Update logs every few stocks (not every single one to avoid perf issues)
-      if (i % 3 === 0 || i === symbolsToScan.length - 1) {
-        setScanLogs([...logsRef.current]);
-      }
-
-      // ---- 250ms DELAY between each API call ----
-      if (i < symbolsToScan.length - 1 && !cancelRef.current) {
-        await delay(250);
+      // 150ms between batches
+      if (batchStart + BATCH_SIZE < symbolsToScan.length && !cancelRef.current) {
+        await delay(150);
       }
     }
 

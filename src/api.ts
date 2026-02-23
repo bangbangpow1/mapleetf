@@ -443,7 +443,7 @@ export interface YahooChartResult {
 // Original (non-logged) fetch — used by search, watchlist, core ETFs
 export async function fetchETFData(yahooSymbol: string): Promise<YahooChartResult | null> {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=6mo&interval=1d&includePrePost=false`;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=1y&interval=1d&includePrePost=false`;
     const response = await fetchWithProxy(url);
     const data = await response.json();
     if (data?.chart?.result?.[0]) {
@@ -464,7 +464,7 @@ export async function fetchETFDataLogged(
   logEntry: ScanLogEntry,
 ): Promise<YahooChartResult | null> {
   const startTime = performance.now();
-  const apiUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=6mo&interval=1d&includePrePost=false`;
+  const apiUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooSymbol}?range=1y&interval=1d&includePrePost=false`;
 
   // On native: call Yahoo Finance directly, skip proxy loop
   if (isNative) {
